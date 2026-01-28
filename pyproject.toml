@@ -1,0 +1,13 @@
+[project]
+name = "make-money"
+version = "0.1.0"
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi[standard]>=0.128.0",
+    "joblib>=1.5.3",
+    "matplotlib>=3.10.8",
+    "numpy>=2.2.6",
+    "pandas>=2.3.3",
+    "scikit-learn>=1.7.2",
+    "yfinance>=1.0",
+]
