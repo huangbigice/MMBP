@@ -55,3 +55,11 @@ class ErrorResponse(BaseModel):
 
     detail: str
 
+
+class ChatStreamRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    symbol: str = Field(..., description="Stock symbol for context, e.g. 2330.TW")
+    message: str = Field(..., description="User message")
+    context: Optional[str] = Field(None, description="Optional extra context text")
+

@@ -37,19 +37,20 @@ df = df.sort_values("date").reset_index(drop=True)
 # 技術指標
 # ----------------------
 df["ma5"] = df["close"].rolling(5).mean()
+df["ma10"] = df["close"].rolling(10).mean()
 df["ma20"] = df["close"].rolling(20).mean()
 df["ma60"] = df["close"].rolling(60).mean()
 df["ma120"] = df["close"].rolling(120).mean()
 df["ma240"] = df["close"].rolling(240).mean()
-df["return_1"] = df["close"].pct_change(1)
-df["return_5"] = df["close"].pct_change(5)
+df["return_1"] = df["close"].pct_change(1) # 每日報酬率
+df["return_5"] = df["close"].pct_change(5) # 5日報酬率
 df["rsi_120"] = compute_rsi(df["close"], 120)
 df["rsi_240"] = compute_rsi(df["close"], 240)
 df["rsi_420"] = compute_rsi(df["close"], 420)
 df["ema120"] = df["close"].ewm(span=120).mean()
 df["ema240"] = df["close"].ewm(span=240).mean()
-df["ema420"] = df["close"].ewm(span=420).mean()
-df["ema200"] = df["close"].ewm(span=200).mean()
+df["ema420"] = df["close"].ewm(span=420).mean() 
+df["ema200"] = df["close"].ewm(span=200).mean() 
 
 # ----------------------
 # 基本面分數
