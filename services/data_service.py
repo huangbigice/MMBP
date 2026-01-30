@@ -27,8 +27,17 @@ class DataService:
     def __init__(self, feature_config: FeatureConfig | None = None):
         self._cfg = feature_config or FeatureConfig()
 
-    def fetch_stock_data(self, symbol: str, period: str = "10y") -> pd.DataFrame:
-        df = yf.download(symbol, period=period)
+    def fetch_stock_data(
+        self,
+        symbol: str,
+        period: str = "10y",
+        start: str | None = None,
+        end: str | None = None,
+    ) -> pd.DataFrame:
+        if start is not None and end is not None:
+            df = yf.download(symbol, start=start, end=end)
+        else:
+            df = yf.download(symbol, period=period)
         if isinstance(df.columns, pd.MultiIndex):
             df.columns = df.columns.get_level_values(0)
 

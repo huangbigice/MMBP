@@ -8,14 +8,18 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
 from api.schemas import (
+    BacktestResponse,
     ChatStreamRequest,
+    EquityCurvePoint,
     HealthResponse,
     IndicatorsResponse,
+    PortfolioBacktestRequest,
     PredictionRequest,
     PredictionResponse,
     StockDataResponse,
 )
 from models.ollama_loader import OllamaLoader
+from services.backtest_service import BacktestService
 from services.data_service import DataService
 from services.prediction_service import PredictionService
  
@@ -34,6 +38,13 @@ def get_data_service(request: Request) -> DataService:
     svc = getattr(request.app.state, "data_service", None)
     if svc is None:
         raise RuntimeError("DataService not initialized")
+    return svc
+
+
+def get_backtest_service(request: Request) -> BacktestService:
+    svc = getattr(request.app.state, "backtest_service", None)
+    if svc is None:
+        raise RuntimeError("BacktestService not initialized")
     return svc
 
 
@@ -135,4 +146,87 @@ def indicators(symbol: str, request: Request, period: str = "10y") -> Indicators
 
     payload = _df_to_records(df)
     return IndicatorsResponse(symbol=symbol, period=period, rows=len(payload), data=payload)
+
+
+@router.get("/backtest", response_model=BacktestResponse)
+def backtest(
+    request: Request,
+    symbol: str,
+    start: str | None = None,
+    end: str | None = None,
+    use_vol_targeting: bool = True,
+    target_vol_annual: float = 0.10,
+    vol_lookback: int = 20,
+    max_leverage: float = 1.0,
+) -> BacktestResponse:
+    """單資產回測，支援波動率目標倉位（預設開啟）。"""
+    backtest_service = get_backtest_service(request)
+    try:
+        result = backtest_service.run_backtest(
+            symbol=symbol,
+            start=start,
+            end=end,
+            use_vol_targeting=use_vol_targeting,
+            target_vol_annual=target_vol_annual,
+            vol_lookback=vol_lookback,
+            max_leverage=max_leverage,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Backtest failed: {e}")
+
+    return BacktestResponse(
+        symbol=result.symbol,
+        start=result.start,
+        end=result.end,
+        annualized_return=result.annualized_return,
+        volatility=result.volatility,
+        max_drawdown=result.max_drawdown,
+        trade_count=result.trade_count,
+        sharpe_ratio=result.sharpe_ratio,
+        equity_curve=[
+            EquityCurvePoint(date=p["date"], cumulative_return=p["cumulative_return"])
+            for p in result.equity_curve
+        ],
+    )
+
+
+@router.post("/backtest/portfolio", response_model=BacktestResponse)
+def backtest_portfolio(
+    request: Request,
+    body: PortfolioBacktestRequest,
+) -> BacktestResponse:
+    """多資產組合回測：逆波動率權重 + 組合層級波動率目標與單一資產權重上限。"""
+    backtest_service = get_backtest_service(request)
+    try:
+        result = backtest_service.run_portfolio_backtest(
+            symbols=body.symbols,
+            start=body.start,
+            end=body.end,
+            target_vol_annual=body.target_vol_annual,
+            vol_lookback=body.vol_lookback,
+            max_leverage=body.max_leverage,
+            target_portfolio_vol_annual=body.target_portfolio_vol_annual,
+            max_single_weight=body.max_single_weight,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Portfolio backtest failed: {e}")
+
+    return BacktestResponse(
+        symbol=result.symbol,
+        start=result.start,
+        end=result.end,
+        annualized_return=result.annualized_return,
+        volatility=result.volatility,
+        max_drawdown=result.max_drawdown,
+        trade_count=result.trade_count,
+        sharpe_ratio=result.sharpe_ratio,
+        equity_curve=[
+            EquityCurvePoint(date=p["date"], cumulative_return=p["cumulative_return"])
+            for p in result.equity_curve
+        ],
+    )
 

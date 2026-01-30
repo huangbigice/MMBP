@@ -52,6 +52,8 @@ df["ema240"] = df["close"].ewm(span=240).mean()
 df["ema420"] = df["close"].ewm(span=420).mean()
 df["ema200"] = df["close"].ewm(span=200).mean()
 
+
+
 df = df.dropna().reset_index(drop=True)
 
 # ========== 特徵 ==========
@@ -60,7 +62,8 @@ FEATURES = [
     "ma5","ma20","ma60","ma120","ma240",
     "return_1","return_5",
     "rsi_120","rsi_240","rsi_420",
-    "ema120","ema240","ema420","ema200"
+    "ema120","ema240","ema420","ema200",
+    "fund_score"
 ]
 
 X = df[FEATURES]

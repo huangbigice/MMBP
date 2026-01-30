@@ -63,3 +63,40 @@ class ChatStreamRequest(BaseModel):
     message: str = Field(..., description="User message")
     context: Optional[str] = Field(None, description="Optional extra context text")
 
+
+# 回測權益曲線單點
+class EquityCurvePoint(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    date: str
+    cumulative_return: float
+
+
+# 回測回應（單資產與組合共用）
+class BacktestResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    symbol: str
+    start: str
+    end: str
+    annualized_return: float
+    volatility: float
+    max_drawdown: float
+    trade_count: int
+    sharpe_ratio: Optional[float] = None
+    equity_curve: list[EquityCurvePoint]
+
+
+# 組合回測請求
+class PortfolioBacktestRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    symbols: list[str] = Field(..., min_length=1, description="標的代碼列表，如 2330.TW, 2454.TW")
+    start: Optional[str] = Field(None, description="開始日期 YYYY-MM-DD")
+    end: Optional[str] = Field(None, description="結束日期 YYYY-MM-DD")
+    target_vol_annual: Optional[float] = Field(0.10, description="單資產目標年化波動率")
+    vol_lookback: int = Field(20, description="波動率估計滾動天數")
+    max_leverage: float = Field(1.0, description="單資產最大槓桿")
+    target_portfolio_vol_annual: Optional[float] = Field(0.10, description="組合層級目標年化波動率")
+    max_single_weight: float = Field(0.40, description="單一資產權重上限")
+

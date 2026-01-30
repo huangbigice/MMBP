@@ -8,6 +8,7 @@ from api.routes import router as api_router
 from config.config_loader import ConfigLoader
 from logger.logger_manager import LoggerManager
 from models.model_loader import ModelLoadConfig, ModelLoader
+from services.backtest_service import BacktestService
 from services.data_service import DataService
 from services.prediction_service import PredictionService
 
@@ -22,11 +23,13 @@ async def lifespan(app: FastAPI):
     model_loader = ModelLoader(ModelLoadConfig(model_path=config.model_path))
     data_service = DataService()
     prediction_service = PredictionService(model_loader=model_loader, data_service=data_service)
+    backtest_service = BacktestService(data_service=data_service, model_loader=model_loader)
 
     app.state.logger = logger
     app.state.model_loader = model_loader
     app.state.data_service = data_service
     app.state.prediction_service = prediction_service
+    app.state.backtest_service = backtest_service
 
     yield
 

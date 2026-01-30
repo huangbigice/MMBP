@@ -84,6 +84,29 @@
   - 回應：`IndicatorsResponse`
     - 包含所有技術指標欄位（MA、RSI、EMA、報酬率等）。
 
+- **單資產回測（含波動率目標倉位）**
+
+  - `GET /api/v1/backtest?symbol=2330.TW&start=2020-01-01&end=2024-12-31`
+  - 可選查詢參數：
+    - `use_vol_targeting=true`（預設）：啟用波動率目標倉位，使策略波動貼近目標。
+    - `target_vol_annual=0.10`：目標年化波動率（如 10%）。
+    - `vol_lookback=20`：波動率估計滾動天數。
+    - `max_leverage=1.0`：單一資產最大槓桿。
+  - 行為：依模型訊號與 2 ATR 移動停損產生倉位，再依 ex-ante 波動率動態調整權重（Volatility Targeting），利於風控與客戶溝通。
+  - 回應：`BacktestResponse`（年化報酬、波動率、最大回撤、夏普、權益曲線等）。
+
+- **多資產組合回測**
+
+  - `POST /api/v1/backtest/portfolio`
+  - Request Body：`PortfolioBacktestRequest`
+    - `symbols`: 標的代碼列表（如 `["2330.TW", "2454.TW"]`）。
+    - `start` / `end`：可選日期區間。
+    - `target_vol_annual`、`vol_lookback`、`max_leverage`：單資產波動率目標參數。
+    - `target_portfolio_vol_annual`：組合層級目標年化波動率。
+    - `max_single_weight`：單一資產權重上限（如 0.40）。
+  - 行為：各標的先做波動率目標倉位回測，再以逆波動率權重（等風險貢獻風格）聚合，並可選組合層級波動率目標與單一資產曝險上限。
+  - 回應：`BacktestResponse`（`symbol="PORTFOLIO"`）。
+
 路由內輔助函式：
 
 - `get_prediction_service(request)` / `get_data_service(request)`：
@@ -386,6 +409,10 @@ uvicorn main:app --reload --host 0.0.0.0 --port 8000
 - `services/`：
   - `data_service.py`：資料抓取與技術指標計算。
   - `prediction_service.py`：完整預測與系統評分流程。
+  - `backtest_service.py`：單資產／組合回測，含波動率目標倉位與多資產風控。
+  - `risk/`：風險與倉位模組。
+    - `position_sizing.py`：波動率目標倉位（Volatility Targeting）。
+    - `portfolio.py`：多資產對齊、逆波動率權重、組合層級波動率目標。
 - `models/`：
   - `model_loader.py`：模型載入與快取。
   - `ollama_loader.py`：LLM 互動封裝。
