@@ -38,6 +38,11 @@ class DataService:
             df = yf.download(symbol, start=start, end=end)
         else:
             df = yf.download(symbol, period=period)
+        if df.empty or len(df) < 2:
+            raise ValueError(
+                f"無法取得該股票 ({symbol}) 的歷史資料，請確認代碼正確（台股請用 .TW，如 2330.TW）或稍後再試。"
+            )
+
         if isinstance(df.columns, pd.MultiIndex):
             df.columns = df.columns.get_level_values(0)
 

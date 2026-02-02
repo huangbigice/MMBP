@@ -13,6 +13,10 @@
 
 整體來說，**MMBP** 扮演「智慧投資決策引擎」的角色，前端僅負責呈現與互動，而所有資料處理、模型推論與評分邏輯皆集中在此後端服務中。
 
+### 模型與策略版本
+
+為符合模型風險管理與可驗證、可追蹤之需求，系統為模型與評分／策略邏輯設定版本號與上線日期。目前使用之 **模型版本**、**策略版本** 與 **上線日期** 由 `config/versioning.py` 定義，並可透過環境變數 `MODEL_VERSION`、`STRATEGY_VERSION`、`MODEL_EFFECTIVE_DATE` 覆寫。預測與回測 API 回應中會帶入 `model_version`、`strategy_version`、`model_effective_date`；另提供 `GET /api/v1/model-info` 查詢目前版本。完整說明（含訓練區間、主要假設與變更日誌）見 [MODEL_VERSION.md](MODEL_VERSION.md)。
+
 ---
 
 ## 核心功能與架構概觀
@@ -21,14 +25,16 @@
 
 - 使用 **FastAPI** 作為 Web Framework。
 - 在 `lifespan` 生命周期中完成：
-  - 設定載入 (`ConfigLoader`)：包含模型路徑等設定。
+  - 設定載入 (`ConfigLoader`)：包含模型路徑與審計目錄／保留天數等設定。
   - Logger 初始化 (`LoggerManager`)。
   - 模型載入器 (`ModelLoader`) 建立。
   - 資料服務 (`DataService`) 與預測服務 (`PredictionService`) 建立。
+  - 審計日誌啟動時清理：刪除超過 `AUDIT_RETENTION_DAYS` 的舊審計檔。
   - 將上述實例掛載到 `app.state`，供路由層方便存取。
 - 設定 FastAPI 應用：
   - `title="make_money API"`
   - `version="0.1.0"`
+  - 掛載審計中介層 (`AuditMiddleware`)：對關鍵 API 記錄 client_ip、X-Client-Id、參數與結果摘要至 JSONL。
   - 掛載 API router：`app.include_router(api_router)`。
 
 ### 2. 路由層 (`api/routes.py`)
@@ -39,6 +45,11 @@
 
   - `GET /api/v1/health`
   - 回傳 `HealthResponse`，可供前端或監控系統確認服務是否正常運作。
+
+- **模型／策略版本**
+
+  - `GET /api/v1/model-info`
+  - 回傳目前 `model_version`、`strategy_version`、`model_effective_date`，以及可選的 `training_interval`、`assumptions`，供稽核與前端顯示「目前使用版本」。
 
 - **LLM 投資助理對話（SSE 串流）**
 
@@ -65,7 +76,7 @@
       - 系統評分 / 技術面評分 / 基本面評分
       - 買進機率 `proba_buy`
       - 建議文字（例如：`"長期持有"`, `"觀望"`, `"不建議持有"`）
-  - 回應：`PredictionResponse`
+  - 回應：`PredictionResponse`（含 `model_version`、`strategy_version`、`model_effective_date`）
 
 - **取得歷史股價資料**
 
@@ -93,7 +104,7 @@
     - `vol_lookback=20`：波動率估計滾動天數。
     - `max_leverage=1.0`：單一資產最大槓桿。
   - 行為：依模型訊號與 2 ATR 移動停損產生倉位，再依 ex-ante 波動率動態調整權重（Volatility Targeting），利於風控與客戶溝通。
-  - 回應：`BacktestResponse`（年化報酬、波動率、最大回撤、夏普、權益曲線等）。
+  - 回應：`BacktestResponse`（年化報酬、波動率、最大回撤、夏普、權益曲線等；含 `model_version`、`strategy_version`、`model_effective_date`）。
 
 - **多資產組合回測**
 
@@ -105,7 +116,7 @@
     - `target_portfolio_vol_annual`：組合層級目標年化波動率。
     - `max_single_weight`：單一資產權重上限（如 0.40）。
   - 行為：各標的先做波動率目標倉位回測，再以逆波動率權重（等風險貢獻風格）聚合，並可選組合層級波動率目標與單一資產曝險上限。
-  - 回應：`BacktestResponse`（`symbol="PORTFOLIO"`）。
+  - 回應：`BacktestResponse`（`symbol="PORTFOLIO"`；含 `model_version`、`strategy_version`、`model_effective_date`）。
 
 路由內輔助函式：
 
@@ -185,9 +196,11 @@
 ### 5. 模型載入與設定 (`models/model_loader.py`, `config/config_loader.py`)
 
 - **`ConfigLoader` / `AppConfig`**
-  - 從環境變數或預設值載入模型路徑：
-    - 環境變數：`MODEL_PATH`
-    - 預設：專案根目錄下 `rf_model_2330.pkl`
+  - 從環境變數或預設值載入模型路徑與審計設定：
+    - 模型路徑：環境變數 `MODEL_PATH`，預設專案根目錄下 `rf_model_2330.pkl`
+    - 審計目錄：`AUDIT_LOG_DIR`，預設 `logs/audit`
+    - 審計保留天數：`AUDIT_RETENTION_DAYS`，預設 180
+    - API Key 雜湊用密鑰：`AUDIT_HMAC_SECRET`（可選）
   - 統一集中管理設定，避免程式中多處硬編路徑。
 
 - **`ModelLoader`**
@@ -205,6 +218,35 @@
   - 使用繁體中文。
   - 針對技術指標與數據進行分析。
   - 加入風險提示，避免保證獲利的用語。
+
+### 7. 審計日誌 (Audit log)
+
+為滿足法遵與內稽「可追溯、可舉證」需求，關鍵 API 呼叫會寫入審計日誌：
+
+- **納入審計的 API**
+  - `POST /api/v1/predict`
+  - `GET /api/v1/backtest`
+  - `POST /api/v1/backtest/portfolio`
+  - `GET /api/v1/stock/{symbol}/indicators`
+  - `GET /api/v1/stock/{symbol}/data`
+
+- **記錄內容（不存完整 request/response）**
+  - 時間（UTC ISO8601）、`request_id`、來源 IP（`client_ip`）、`X-Client-Id`（`client_id`）、`X-Api-Key` 雜湊（若有）。
+  - 方法、路徑、查詢/body 參數摘要、`symbol`/`symbols`。
+  - 回應狀態碼、延遲（ms）、結果摘要（如 `recommendation`、`system_score`、`annualized_return`、`rows` 等），失敗時含 `error_type`、`error_message`。
+
+- **寫入位置與格式**
+  - 目錄：由環境變數 `AUDIT_LOG_DIR` 指定，預設為專案根目錄下 `logs/audit`。
+  - 檔名：`audit-YYYY-MM-DD.jsonl`（每日一檔，JSON Lines，每行一筆 JSON）。
+
+- **保留期限與清理**
+  - 由 `AUDIT_RETENTION_DAYS` 指定（預設 180 天）。服務啟動時會自動刪除超過保留天數的舊檔。
+
+- **存取權限建議**
+  - 寫入時新檔權限為 `0600`（僅 owner 可讀寫）。建議僅部署主機上的 ops／稽核帳號可讀取審計目錄，以利風控／法遵審查。
+
+- **環境變數（見下方「設定環境變數與模型檔」）**
+  - `AUDIT_LOG_DIR`、`AUDIT_RETENTION_DAYS`、`AUDIT_HMAC_SECRET`（用於 API Key 雜湊，不存明文）。
 
 ---
 
@@ -301,6 +343,14 @@ pip install fastapi[standard] httpx joblib matplotlib numpy pandas scikit-learn 
 
 ```env
 MODEL_PATH=/absolute/path/to/your_model.pkl
+```
+
+可選的審計日誌相關變數（法遵／內稽用）：
+
+```env
+AUDIT_LOG_DIR=/path/to/logs/audit   # 審計 JSONL 目錄，預設為專案根目錄下 logs/audit
+AUDIT_RETENTION_DAYS=180            # 審計檔保留天數，預設 180
+AUDIT_HMAC_SECRET=your_secret       # 用於 X-Api-Key 雜湊（HMAC-SHA256），不存明文；可選
 ```
 
 說明：

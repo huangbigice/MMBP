@@ -5,6 +5,7 @@ from typing import Any, Mapping
 
 import pandas as pd
 
+from config.versioning import ModelVersionInfo
 from models.model_loader import ModelLoader
 from services.data_service import DataService
 from system_rating import get_latest_fund_score, system_rating
@@ -26,6 +27,9 @@ class PredictionResult:
     fund_score: float
     proba_buy: float
     recommendation: str
+    model_version: str
+    strategy_version: str
+    model_effective_date: str
 
 
 class PredictionService:
@@ -36,11 +40,20 @@ class PredictionService:
     - fetch fundamental score
     - model inference
     - system rating aggregation
+
+    部分股票無法預測常見原因：歷史資料不足（需約 420 交易日）、
+    資料源暫時異常或該日有缺漏；同一股票偶爾失敗再試一次可成功，多為資料源不穩定。
     """
 
-    def __init__(self, model_loader: ModelLoader, data_service: DataService):
+    def __init__(
+        self,
+        model_loader: ModelLoader,
+        data_service: DataService,
+        model_version_info: ModelVersionInfo,
+    ):
         self._model_loader = model_loader
         self._data_service = data_service
+        self._version_info = model_version_info
 
     def predict_latest(self, symbol: str, period: str = "10y") -> PredictionResult:
         model = self._model_loader.load()
@@ -55,7 +68,10 @@ class PredictionService:
         df_latest = df.iloc[-1:].copy()
 
         if df_latest[features].isna().any().any():
-            raise ValueError("最新一天特徵有缺失值，資料不足以進行預測")
+            raise ValueError(
+                "最新一天特徵有缺失值，資料不足以進行預測。"
+                "可能原因：該股票歷史資料不足（需至少約 420 個交易日）、最近有缺漏，或資料源暫時異常。請稍後再試。"
+            )
 
         X = df_latest[features]
 
@@ -85,5 +101,8 @@ class PredictionService:
             fund_score=float(row["fund_score"]),
             proba_buy=float(row["proba_buy"]),
             recommendation=str(row["recommendation"]),
+            model_version=self._version_info.model_version,
+            strategy_version=self._version_info.strategy_version,
+            model_effective_date=self._version_info.model_effective_date,
         )
 

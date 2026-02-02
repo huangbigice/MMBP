@@ -78,12 +78,22 @@ def fundamental_score(
     }
     low_g, high_g = growth_range.get(industry, growth_range["other"])
 
-    # ========= 各分項 =========
-    growth_score = clamp((revenue_growth - low_g) / (high_g - low_g))
-    earnings_score = clamp((earnings_growth - low_g) / (high_g - low_g))
+    # ========= 各分項（yfinance 有時缺欄位，None 以中性分數處理）=========
+    if revenue_growth is None:
+        growth_score = 0.5
+    else:
+        growth_score = clamp((revenue_growth - low_g) / (high_g - low_g))
 
-    # 股息不鼓勵過高
-    dividend_score = clamp(dividend_yield / 0.06)
+    if earnings_growth is None:
+        earnings_score = 0.5
+    else:
+        earnings_score = clamp((earnings_growth - low_g) / (high_g - low_g))
+
+    # 股息不鼓勵過高；缺資料時視為 0
+    if dividend_yield is None:
+        dividend_score = 0.0
+    else:
+        dividend_score = clamp(dividend_yield / 0.06)
 
     # ========= 權重（可調） =========
     total = (
@@ -156,16 +166,16 @@ def fundamental_score(
 
 def get_latest_fund_score(symbol, industry="tech"):
     t = yf.Ticker(symbol)
-    info = t.info
+    info = t.info or {}
 
     revenue_growth = info.get("revenueGrowth")
     earnings_growth = info.get("earningsGrowth")
 
-    dividend = info.get("trailingAnnualDividendRate", 0)
-    price = info.get("regularMarketPrice", np.nan)
+    dividend = info.get("trailingAnnualDividendRate") or 0
+    price = info.get("regularMarketPrice") or np.nan
 
-    if price and price > 0:
-        dividend_yield = dividend / price
+    if price is not None and not (isinstance(price, float) and np.isnan(price)) and price > 0:
+        dividend_yield = (dividend or 0) / price
     else:
         dividend_yield = 0.0
 

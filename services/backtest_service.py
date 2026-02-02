@@ -13,6 +13,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
+from config.versioning import ModelVersionInfo
 from models.model_loader import ModelLoader
 from services.data_service import DataService
 from services.risk import (
@@ -55,6 +56,9 @@ class BacktestResult:
     trade_count: int
     sharpe_ratio: float | None
     equity_curve: list[dict[str, Any]]
+    model_version: str
+    strategy_version: str
+    model_effective_date: str
 
 
 def _compute_atr_position(df: pd.DataFrame) -> pd.Series:
@@ -98,9 +102,11 @@ class BacktestService:
         self,
         data_service: DataService,
         model_loader: ModelLoader,
+        model_version_info: ModelVersionInfo,
     ):
         self._data_service = data_service
         self._model_loader = model_loader
+        self._version_info = model_version_info
 
     def run_backtest(
         self,
@@ -226,6 +232,9 @@ class BacktestService:
             trade_count=0,  # 組合不統計單一交易次數
             sharpe_ratio=round(sharpe, 4) if sharpe is not None else None,
             equity_curve=equity_curve,
+            model_version=self._version_info.model_version,
+            strategy_version=self._version_info.strategy_version,
+            model_effective_date=self._version_info.model_effective_date,
         )
 
     def _build_backtest_df(
@@ -321,4 +330,7 @@ class BacktestService:
             trade_count=trade_count,
             sharpe_ratio=round(sharpe, 4) if sharpe is not None else None,
             equity_curve=equity_curve,
+            model_version=self._version_info.model_version,
+            strategy_version=self._version_info.strategy_version,
+            model_effective_date=self._version_info.model_effective_date,
         )

@@ -13,6 +13,7 @@ from api.schemas import (
     EquityCurvePoint,
     HealthResponse,
     IndicatorsResponse,
+    ModelInfoResponse,
     PortfolioBacktestRequest,
     PredictionRequest,
     PredictionResponse,
@@ -72,6 +73,21 @@ def _sse_event(event: str, data: str) -> str:
 def health() -> HealthResponse:
     return HealthResponse()
 
+
+@router.get("/model-info", response_model=ModelInfoResponse)
+def model_info(request: Request) -> ModelInfoResponse:
+    """目前使用之模型／策略版本與上線日，供稽核與前端顯示。"""
+    info = getattr(request.app.state, "model_version_info", None)
+    if info is None:
+        raise RuntimeError("model_version_info not initialized")
+    return ModelInfoResponse(
+        model_version=info.model_version,
+        strategy_version=info.strategy_version,
+        model_effective_date=info.model_effective_date,
+        training_interval=info.training_interval,
+        assumptions=list(info.assumptions),
+    )
+
 @router.post("/chat/stream")
 async def chat_stream(req: ChatStreamRequest) -> StreamingResponse:
     """
@@ -120,6 +136,9 @@ def predict(req: PredictionRequest, request: Request) -> PredictionResponse:
         proba_buy=result.proba_buy,
         recommendation=result.recommendation,
         timestamp=datetime.now(timezone.utc),
+        model_version=result.model_version,
+        strategy_version=result.strategy_version,
+        model_effective_date=result.model_effective_date,
     )
 
 
@@ -189,6 +208,9 @@ def backtest(
             EquityCurvePoint(date=p["date"], cumulative_return=p["cumulative_return"])
             for p in result.equity_curve
         ],
+        model_version=result.model_version,
+        strategy_version=result.strategy_version,
+        model_effective_date=result.model_effective_date,
     )
 
 
@@ -228,5 +250,8 @@ def backtest_portfolio(
             EquityCurvePoint(date=p["date"], cumulative_return=p["cumulative_return"])
             for p in result.equity_curve
         ],
+        model_version=result.model_version,
+        strategy_version=result.strategy_version,
+        model_effective_date=result.model_effective_date,
     )
 

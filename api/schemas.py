@@ -5,6 +5,11 @@ from typing import Any, Dict, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
+# 版本欄位說明（預測／回測共用）
+_DESC_MODEL_VERSION = "模型版本號"
+_DESC_STRATEGY_VERSION = "策略／評分邏輯版本號"
+_DESC_MODEL_EFFECTIVE_DATE = "模型上線日期 YYYY-MM-DD"
+
 # 預測請求
 class PredictionRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -24,6 +29,9 @@ class PredictionResponse(BaseModel):
     proba_buy: float
     recommendation: str
     timestamp: datetime
+    model_version: str = Field(..., description=_DESC_MODEL_VERSION)
+    strategy_version: str = Field(..., description=_DESC_STRATEGY_VERSION)
+    model_effective_date: str = Field(..., description=_DESC_MODEL_EFFECTIVE_DATE)
 
 # 股票資料
 class StockDataResponse(BaseModel):
@@ -48,6 +56,18 @@ class HealthResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     status: str = "ok"
+
+
+class ModelInfoResponse(BaseModel):
+    """目前使用之模型／策略版本，供稽核與前端顯示。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    model_version: str = Field(..., description=_DESC_MODEL_VERSION)
+    strategy_version: str = Field(..., description=_DESC_STRATEGY_VERSION)
+    model_effective_date: str = Field(..., description=_DESC_MODEL_EFFECTIVE_DATE)
+    training_interval: Optional[str] = Field(None, description="訓練／驗證區間（若有）")
+    assumptions: list[str] = Field(default_factory=list, description="主要假設摘要")
 
 
 class ErrorResponse(BaseModel):
@@ -85,6 +105,9 @@ class BacktestResponse(BaseModel):
     trade_count: int
     sharpe_ratio: Optional[float] = None
     equity_curve: list[EquityCurvePoint]
+    model_version: str = Field(..., description=_DESC_MODEL_VERSION)
+    strategy_version: str = Field(..., description=_DESC_STRATEGY_VERSION)
+    model_effective_date: str = Field(..., description=_DESC_MODEL_EFFECTIVE_DATE)
 
 
 # 組合回測請求
