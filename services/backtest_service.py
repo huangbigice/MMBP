@@ -16,11 +16,13 @@ import pandas as pd
 from config.versioning import ModelVersionInfo
 from models.model_loader import ModelLoader
 from services.data_service import DataService
+from services.backtest import add_adx, compute_position_long_short, compute_regime
 from services.risk import (
     PortfolioRiskConfig,
     VolTargetConfig,
     align_returns,
     aggregate_portfolio_returns,
+    compute_confidence_vol_weights,
     compute_inverse_vol_weights,
     compute_vol_target_weights,
 )
@@ -61,31 +63,6 @@ class BacktestResult:
     model_effective_date: str
 
 
-def _compute_atr_position(df: pd.DataFrame) -> pd.Series:
-    """依訊號與 2 ATR 移動停損計算每日 0/1 倉位。"""
-    position = pd.Series(0, index=df.index)
-    in_position = False
-    stop_price = 0.0
-    for i in range(len(df)):
-        price = df.loc[df.index[i], "close"]
-        atr = df.loc[df.index[i], "ATR"]
-        if in_position:
-            if price < stop_price:
-                in_position = False
-            else:
-                position.iloc[i] = 1
-                stop_price = max(stop_price, price - ATR_STOP_MULTIPLIER * atr)
-        else:
-            if (
-                df.loc[df.index[i], "signal"] == 1
-                and price > df.loc[df.index[i], "ma_200"]
-            ):
-                in_position = True
-                stop_price = price - ATR_STOP_MULTIPLIER * atr
-                position.iloc[i] = 1
-    return position
-
-
 # ---------------------------------------------------------------------------
 # 回測服務
 # ---------------------------------------------------------------------------
@@ -119,9 +96,17 @@ class BacktestService:
         target_vol_annual: float | None = 0.10,
         vol_lookback: int = 20,
         max_leverage: float = 1.0,
+        null_mode: None | str = None,
+        shuffle_seed: int | None = None,
     ) -> BacktestResult:
         """
         單資產回測。可選波動率目標倉位（預設開啟）。
+
+        null_mode: 用於 Null Model 殺戮測試。
+          - None: 真實模型
+          - "shuffled": 將 proba_buy 打亂（等同標籤打亂的隨機訊號）
+          - "hold": 永遠觀望（signal_long=0, signal_short=0）
+        shuffle_seed: null_mode="shuffled" 時可指定隨機種子以便重現。
         """
         vol_config = None
         if use_vol_targeting and target_vol_annual is not None:
@@ -137,8 +122,45 @@ class BacktestService:
             end=end,
             threshold=threshold,
             vol_config=vol_config,
+            null_mode=null_mode,
+            shuffle_seed=shuffle_seed,
         )
         return self._result_from_df(df, symbol)
+
+    def get_backtest_df(
+        self,
+        symbol: str,
+        start: str | None = None,
+        end: str | None = None,
+        *,
+        threshold: float = DEFAULT_THRESHOLD,
+        use_vol_targeting: bool = True,
+        target_vol_annual: float | None = 0.10,
+        vol_lookback: int = 20,
+        max_leverage: float = 1.0,
+        null_mode: None | str = None,
+        shuffle_seed: int | None = None,
+    ) -> pd.DataFrame:
+        """
+        回傳單一標的之回測 DataFrame（含 date, regime, strategy_return, weight 等）。
+        供驗證層（如 Regime 生存測試）分析使用。
+        """
+        vol_config = None
+        if use_vol_targeting and target_vol_annual is not None:
+            vol_config = VolTargetConfig(
+                target_vol_annual=target_vol_annual,
+                vol_lookback=vol_lookback,
+                max_leverage=max_leverage,
+            )
+        return self._build_backtest_df(
+            symbol=symbol,
+            start=start,
+            end=end,
+            threshold=threshold,
+            vol_config=vol_config,
+            null_mode=null_mode,
+            shuffle_seed=shuffle_seed,
+        )
 
     def run_portfolio_backtest(
         self,
@@ -245,10 +267,14 @@ class BacktestService:
         *,
         threshold: float = DEFAULT_THRESHOLD,
         vol_config: VolTargetConfig | None = None,
+        null_mode: None | str = None,
+        shuffle_seed: int | None = None,
     ) -> pd.DataFrame:
         """
         產生單一標的之回測 DataFrame（含 date, strategy_return, cum_return, drawdown 等）。
         供 run_backtest 與 run_portfolio_backtest 使用。
+
+        null_mode: "shuffled" 打亂 proba_buy；"hold" 強制永遠觀望。
         """
         period = "10y" if (start and end) else "5y"
         df = self._data_service.fetch_stock_data(
@@ -258,6 +284,7 @@ class BacktestService:
             raise ValueError("區間內無資料")
 
         df = self._data_service.add_indicators(df)
+        df = self._data_service.add_market_regime(df)
         df["ma_200"] = df["close"].rolling(200).mean()
         high, low, close = df["high"], df["low"], df["close"]
         tr = pd.concat([
@@ -268,6 +295,11 @@ class BacktestService:
         df["ATR"] = tr.rolling(14).mean()
         df["fund_score"] = BACKTEST_FUND_SCORE
 
+        # 多因子 regime 用：ADX、ma_200_slope、regime
+        df = add_adx(df, period=14)
+        df["ma_200_slope"] = df["ma_200"].diff(5)
+        df["regime"] = compute_regime(df, adx_threshold=20, slope_window=5)
+
         features = self._data_service.required_features()
         df = df.dropna(subset=features).reset_index(drop=True)
         if df.empty:
@@ -276,15 +308,35 @@ class BacktestService:
         model = self._model_loader.load()
         X = df[features]
         pred = model.predict(X)
+        proba = model.predict_proba(X)
+        classes = list(getattr(model, "classes_", []))
+        idx_buy = classes.index(1) if 1 in classes else 0
         df = df.copy()
-        df["signal"] = ((pred == 1) & (df["fund_score"] > threshold)).astype(int)
+        df["proba_buy"] = proba[:, idx_buy]
+        df["signal_long"] = ((pred == 1) & (df["fund_score"] > threshold)).astype(int)
+        df["signal_short"] = (df["proba_buy"] < 0.5).astype(int)
 
-        df["position"] = _compute_atr_position(df)
+        # Null Model 殺戮測試：打亂訊號或永遠觀望
+        if null_mode == "shuffled":
+            rng = np.random.default_rng(shuffle_seed)
+            shuffled_proba = df["proba_buy"].values.copy()
+            rng.shuffle(shuffled_proba)
+            df["proba_buy"] = shuffled_proba
+            df["signal_long"] = ((df["proba_buy"] > threshold) & (df["fund_score"] > threshold)).astype(int)
+            df["signal_short"] = (df["proba_buy"] < 0.5).astype(int)
+        elif null_mode == "hold":
+            df["signal_long"] = 0
+            df["signal_short"] = 0
+            df["proba_buy"] = 0.5
 
-        # 倉位權重：波動率目標或 100%
+        df["position"] = compute_position_long_short(
+            df, atr_mult=ATR_STOP_MULTIPLIER
+        )
+
+        # 倉位權重：信心加權波動率目標或單純 position
         if vol_config is not None:
-            weight = compute_vol_target_weights(
-                df["position"], df["return_1"], vol_config
+            weight = compute_confidence_vol_weights(
+                df["position"], df["proba_buy"], df["return_1"], vol_config
             )
             df["weight"] = weight
             turnover = df["weight"].diff().abs().fillna(0.0)
@@ -307,7 +359,7 @@ class BacktestService:
         ann_return = total_return ** (1 / n_years) - 1
         ann_vol = float(df["strategy_return"].std() * np.sqrt(252))
         max_dd = float(df["drawdown"].min())
-        trade_count = int(df["signal"].sum())
+        trade_count = int(((df["position"] != 0) & (df["position"].shift(1) == 0)).sum())
         sharpe = (
             (ann_return - RISK_FREE_RATE) / ann_vol if ann_vol > 0 else None
         )

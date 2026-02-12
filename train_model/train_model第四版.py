@@ -113,8 +113,8 @@ def main():
     # ---------- 權重 ----------
     @dataclass
     class FundamentalWeights:
-        growth: float = 0.45
-        relative: float = 0.30
+        growth: float = 0.50
+        relative: float = 0.25
         dividend: float = 0.25
 
 

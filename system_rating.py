@@ -5,8 +5,8 @@ import yfinance as yf
 # ===============================
 # 系統權重（之後優化只調這裡）
 # ===============================
-W_PROBA = 0.45 # 模型機率
-W_FUND  = 0.30 # 基本面
+W_PROBA = 0.50 # 模型機率
+W_FUND  = 0.25 # 基本面
 W_TECH  = 0.25 # 技術面
 
 # BUY_THRESHOLD = 0.65
@@ -72,7 +72,7 @@ def fundamental_score(
 
     # ========= 產業合理區間 =========
     growth_range = {
-        "tech":     (0.05, 0.30),
+        "tech":     (0.05, 0.25),
         "finance":  (0.02, 0.15),
         "other":    (0.03, 0.20)
     }
@@ -97,7 +97,7 @@ def fundamental_score(
 
     # ========= 權重（可調） =========
     total = (
-        0.45 * growth_score +
+        0.50 * growth_score +
         0.35 * earnings_score +
         0.20 * dividend_score
     )
@@ -142,8 +142,8 @@ def fundamental_score(
 
 #         # ---- 加權 ----
 #         fund_score = (
-#             0.45 * growth_score +
-#             0.30 * relative_score +
+#             0.50 * growth_score +
+#             0.25 * relative_score +
 #             0.25 * dividend_score
 #         )
 #         print(f"""

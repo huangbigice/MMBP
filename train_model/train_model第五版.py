@@ -8,6 +8,15 @@ from sklearn.metrics import classification_report
 import joblib  # 用來存模型
 import json
 
+# from labeling import build_relative_labels
+from train_model.labeling import build_relative_labels
+from train_model.market_regime import (
+# from market_regime import (
+    MKT_REGIME_FEATURES,
+    compute_market_regime_features,
+    merge_regime_into_panel,
+)
+
 def compute_rsi(series, window):
     delta = series.diff()
     gain = delta.clip(lower=0)
@@ -39,15 +48,31 @@ def get_revenue_cagr(ticker, years=6):
     return cagr
 
 # 股息殖利率
-def get_dividend_yield(ticker):
+def get_dividend_yield(ticker, price_fallback=None):
+    """
+    price_fallback: 若 yfinance 當日無報價（休市、下市等），用此價格計算，避免 IndexError。
+    若 yfinance API 回傳 None（限流、暫停或該標的無資料），改回傳 0.0 避免程式崩潰。
+    """
     t = yf.Ticker(ticker)
-    div = t.dividends
-
-    if len(div) == 0:
+    try:
+        div = t.dividends
+    except (TypeError, KeyError):
+        return 0.0
+    if div is None or len(div) == 0:
         return 0.0
 
     last_year_div = div[div.index > (div.index.max() - pd.Timedelta("365D"))].sum()
-    price = t.history(period="1d")["Close"].iloc[-1]
+    try:
+        hist = t.history(period="1d")
+    except (TypeError, KeyError):
+        hist = None
+    if hist is None or hist.empty:
+        if price_fallback is not None and price_fallback > 0:
+            price = float(price_fallback)
+        else:
+            return 0.0
+    else:
+        price = float(hist["Close"].iloc[-1])
 
     return last_year_div / price
 
@@ -59,8 +84,8 @@ def get_alpha(stock_df, market="^TWII"):
 
     mkt_ret = mkt["Close"].pct_change().add(1).cumprod().iloc[-1] - 1
     stk_ret = stock_df["close"].pct_change().add(1).cumprod().iloc[-1] - 1
-
-    return float(stk_ret - mkt_ret)
+    diff = stk_ret - mkt_ret
+    return float(diff.iloc[0]) if hasattr(diff, "iloc") else float(diff)
 
 
 
@@ -107,83 +132,25 @@ def main():
 
     all_df = []
 
-    for ticker, industry in STOCKS.items():
-        print("下載:", ticker)
-
-        df = yf.download(ticker, start="2020-01-01", end="2026-01-01")
-
-        if df is None or len(df) == 0:
-            print("跳過空資料:", ticker)
-            continue
-
-        if isinstance(df.columns, pd.MultiIndex):
-            df.columns = df.columns.get_level_values(0)
-
-        df = df.rename(columns={
-            "Open": "open",
-            "High": "high",
-            "Low": "low",
-            "Close": "close",
-            "Volume": "volume"
-        })
-
-        df = df.reset_index()
-        df["date"] = pd.to_datetime(df["Date"])
-        df = df[["date", "open", "high", "low", "close", "volume"]]
-        df = df.sort_values("date").reset_index(drop=True)
-        df = df.dropna()
-
-        # 去極值
-        for col in ["open", "high", "low", "close", "volume"]:
-            low = df[col].quantile(0.01)
-            high = df[col].quantile(0.99)
-            df[col] = df[col].clip(low, high)
-
-        df["ticker"] = ticker
-        df["industry"] = industry
-
-        all_df.append(df)
-
-    print("成功股票數:", len(all_df))
-    df = pd.concat(all_df).reset_index(drop=True)
-    print("總樣本數:", len(df))
-
-
     from dataclasses import dataclass
 
-    # ---------- 工具函數 ----------
     def clamp(x, min_val=0.0, max_val=1.0):
         return max(min(x, max_val), min_val)
 
-
-    # ---------- 各指標轉分數（可依產業調整） ----------
     def score_cagr(cagr, industry="other"):
-        """
-        CAGR 評分
-        - industry: "tech", "finance", "other"
-        - 不同產業有不同的低/高門檻
-        """
         if cagr is None:
             return 0.0
-
         thresholds = {
-            "tech": (0.05, 0.25),     # 科技股成長門檻高
-            "finance": (0.02, 0.12),  # 金融股成長門檻低
-            "other": (0.03, 0.15)     # 其他產業中間
+            "tech": (0.05, 0.25),
+            "finance": (0.02, 0.12),
+            "other": (0.03, 0.15)
         }
         low, high = thresholds.get(industry, thresholds["other"])
         return clamp((cagr - low) / (high - low))
 
-
     def score_relative_performance(alpha, industry="other"):
-        """
-        相對市場表現（超額報酬）
-        - alpha = 股票報酬 - 大盤報酬
-        - 不同產業可調 alpha 範圍，但這裡保持原始 -20~20% 為主
-        """
         if alpha is None:
             return 0.5
-        # 可選擇依產業調整上限，例如金融股波動小，科技股波動大
         ranges = {
             "tech": (-0.25, 0.25),
             "finance": (-0.15, 0.15),
@@ -192,34 +159,23 @@ def main():
         low, high = ranges.get(industry, ranges["other"])
         return clamp((alpha - low) / (high - low))
 
-
     def score_dividend_yield(div_yield, industry="other"):
-        """
-        股息殖利率評分
-        - 不鼓勵過高殖利率（封頂）
-        - 不同行業期望不同
-        """
         if div_yield is None:
             return 0.0
-
         limits = {
-            "tech": (0.0, 0.03),      # 科技股通常低股息
-            "finance": (0.0, 0.06),   # 金融股較高股息
-            "other": (0.0, 0.05)      # 其他產業中間
+            "tech": (0.0, 0.03),
+            "finance": (0.0, 0.06),
+            "other": (0.0, 0.05)
         }
         low, high = limits.get(industry, limits["other"])
         return clamp((div_yield - low) / (high - low))
 
-
-    # ---------- 權重 ----------
     @dataclass
     class FundamentalWeights:
-        growth: float = 0.45
-        relative: float = 0.30
+        growth: float = 0.50
+        relative: float = 0.25
         dividend: float = 0.25
 
-
-    # ---------- 總評分 ----------
     def fundamental_score(
         revenue_cagr,
         relative_alpha,
@@ -227,21 +183,14 @@ def main():
         weights=FundamentalWeights(),
         industry="other"
     ):
-        """
-        回傳：
-        - total_score (0~1)
-        - breakdown dict
-        """
         growth_score = score_cagr(revenue_cagr, industry)
         relative_score = score_relative_performance(relative_alpha, industry)
         dividend_score = score_dividend_yield(dividend_yield, industry)
-
         total = (
             growth_score * weights.growth +
             relative_score * weights.relative +
             dividend_score * weights.dividend
         )
-
         return {
             "total_score": round(total, 3),
             "growth_score": round(growth_score, 3),
@@ -249,112 +198,119 @@ def main():
             "dividend_score": round(dividend_score, 3)
         }
 
-
-
-    # 計算技術指標
-    df["ma5"] = df["close"].rolling(5).mean()
-    df["ma20"] = df["close"].rolling(20).mean()
-    df["ma60"] = df["close"].rolling(60).mean()
-    df["ma120"] = df["close"].rolling(120).mean()
-    df["ma240"] = df["close"].rolling(240).mean()
-    df["return_1"] = df["close"].pct_change(1)
-    df["return_5"] = df["close"].pct_change(5)
-
-    df["rsi_120"] = compute_rsi(df["close"], 120)
-    df["rsi_240"] = compute_rsi(df["close"], 240)
-    df["rsi_420"] = compute_rsi(df["close"], 420)
-
-    df["ema120"] = df["close"].ewm(span=120, adjust=False).mean()
-    df["ema240"] = df["close"].ewm(span=240, adjust=False).mean()
-    df["ema420"] = df["close"].ewm(span=420, adjust=False).mean()
-    # df["ema200"] = float(df["close"].rolling(window=200).mean()).iloc[-1]
-    df["ema200"] = df["close"].ewm(span=200, adjust=False).mean()
-
-
-    df = df.dropna().reset_index(drop=True)
-
-    # ====== 基本面資料（手動版，之後可接 API） ======
-    # fundamental_df = pd.DataFrame([
-    #     {"date": "2023-08-15", "revenue_cagr": 0.12, "alpha": 0.08, "div_yield": 0.025},
-    #     {"date": "2024-03-15", "revenue_cagr": 0.15, "alpha": 0.10, "div_yield": 0.022},
-    #     {"date": "2024-11-15", "revenue_cagr": 0.18, "alpha": 0.14, "div_yield": 0.020},
-    # ])
-    # fundamental_df["date"] = pd.to_datetime(fundamental_df["date"])
-
-    # # 算基本面分數
-    # fundamental_df["fund_score"] = fundamental_df.apply(
-    #     lambda row: fundamental_score(
-    #         row["revenue_cagr"],
-    #         row["alpha"],
-    #         row["div_yield"],
-    #         industry="tech"
-    #     )["total_score"],
-    #     axis=1
-    # )
-
-    # # 對齊到每日股價
-    # df = df.merge(fundamental_df[["date", "fund_score"]],
-    #             on="date",
-    #             how="left")
-    # df["fund_score"] = df["fund_score"].ffill()
-    
-    
-    # ====== 基本面資料（真實 yfinance 版） ======
-    revenue_cagr = get_revenue_cagr(ticker)
-    div_yield = get_dividend_yield(ticker)
-    alpha = get_alpha(df)
-
-    fund_score_dict = fundamental_score(
-        revenue_cagr,
-        alpha,
-        div_yield,
-        industry=industry
-    )
-
-    fundamental_df = pd.DataFrame([{
-        "date": df["date"].max(),   # 最新一筆財報視為目前有效
-        "fund_score": fund_score_dict["total_score"]
-    }])
-
-    # 對齊到每日股價
-    df = df.merge(fundamental_df, on="date", how="left")
-    df["fund_score"] = df["fund_score"].ffill()
-
-
-
-    # 標籤：未來 60 天報酬
     horizon = 30
-    df["future_return_60"] = df["close"].shift(-horizon) / df["close"] - 1
 
+    for ticker, industry in STOCKS.items():
+        print("下載:", ticker)
 
-    # df["label"] = 2  # 預設觀望
-    df.loc[(df["future_return_60"] > 0.05) & (df["future_return_60"] <= 0.10), "label"] = 2 # 建議觀望
-    df.loc[df["future_return_60"] > 0.10, "label"] = 1   # 長期持有
-    df.loc[df["future_return_60"] < -0.05, "label"] = 0  # 不適合
+        single = yf.download(ticker, start="2020-01-01", end="2026-01-01")
 
-    df = df.dropna().reset_index(drop=True)
+        if single is None or len(single) == 0:
+            print("跳過空資料:", ticker)
+            continue
+
+        if isinstance(single.columns, pd.MultiIndex):
+            single.columns = single.columns.get_level_values(0)
+
+        single = single.rename(columns={
+            "Open": "open",
+            "High": "high",
+            "Low": "low",
+            "Close": "close",
+            "Volume": "volume"
+        }).reset_index()
+        single["date"] = pd.to_datetime(single["Date"])
+        single = single[["date", "open", "high", "low", "close", "volume"]].sort_values("date").reset_index(drop=True).dropna()
+
+        for col in ["open", "high", "low", "close", "volume"]:
+            lo, hi = single[col].quantile(0.01), single[col].quantile(0.99)
+            single[col] = single[col].clip(lo, hi).astype(float)
+
+        single["ticker"] = ticker
+        single["industry"] = industry
+
+        # 技術指標：僅用「此檔」的 close，不跨股票
+        single["ma5"] = single["close"].rolling(5).mean()
+        single["ma20"] = single["close"].rolling(20).mean()
+        single["ma60"] = single["close"].rolling(60).mean()
+        single["ma120"] = single["close"].rolling(120).mean()
+        single["ma240"] = single["close"].rolling(240).mean()
+        single["return_1"] = single["close"].pct_change(1)
+        single["return_5"] = single["close"].pct_change(5)
+        single["rsi_120"] = compute_rsi(single["close"], 120)
+        single["rsi_240"] = compute_rsi(single["close"], 240)
+        single["rsi_420"] = compute_rsi(single["close"], 420)
+        single["ema120"] = single["close"].ewm(span=120, adjust=False).mean()
+        single["ema240"] = single["close"].ewm(span=240, adjust=False).mean()
+        single["ema420"] = single["close"].ewm(span=420, adjust=False).mean()
+        single["ema200"] = single["close"].ewm(span=200, adjust=False).mean()
+
+        # 基本面：此檔專用（若當日無報價則用該檔最近收盤價當 fallback）
+        revenue_cagr = get_revenue_cagr(ticker)
+        div_yield = get_dividend_yield(ticker, price_fallback=single["close"].iloc[-1])
+        alpha = get_alpha(single)
+        fund_dict = fundamental_score(revenue_cagr, alpha, div_yield, industry=industry)
+        single["fund_score"] = fund_dict["total_score"]
+
+        # 未來報酬（同一檔內計算）；標籤改在合併後以「相對排名」建構（見 build_relative_labels）
+        single["future_return_30"] = single["close"].shift(-horizon) / single["close"] - 1
+
+        single = single.dropna(subset=["ma240", "rsi_420", "ema200", "future_return_30"]).reset_index(drop=True)
+        if len(single) == 0:
+            continue
+        all_df.append(single)
+
+    print("成功股票數:", len(all_df))
+    df = pd.concat(all_df, ignore_index=True)
+    print("合併後樣本數:", len(df))
+
+    # 相對標籤：依當日橫斷面排名，前 20% → 1、後 20% → 0、中間 → 2
+    df = build_relative_labels(
+        df,
+        horizon_col="future_return_30",
+        top_pct=0.2,
+        bottom_pct=0.2,
+        min_stocks_per_date=5,
+    )
+    print("相對標籤後樣本數（剔除當日不足 5 檔的日期）:", len(df))
     print(df["label"].value_counts(normalize=True))
 
-    # df = df.dropna().reset_index(drop=True)
+    # 大盤 regime 特徵：^TWII 趨勢、波動、回撤，以 date 合併進 panel
+    market_symbol = "^TWII"
+    date_min, date_max = df["date"].min(), df["date"].max()
+    mkt = yf.download(
+        market_symbol,
+        start=(date_min - pd.Timedelta(days=100)).strftime("%Y-%m-%d"),
+        end=date_max.strftime("%Y-%m-%d"),
+    )
+    if mkt is None or mkt.empty:
+        raise RuntimeError("無法下載大盤資料，請檢查網路或代碼 " + market_symbol)
+    if isinstance(mkt.columns, pd.MultiIndex):
+        mkt.columns = mkt.columns.get_level_values(0)
+    mkt = mkt.rename(columns={"Open": "open", "High": "high", "Low": "low", "Close": "close", "Volume": "volume"}).reset_index()
+    mkt["date"] = pd.to_datetime(mkt["Date"])
+    regime_df = compute_market_regime_features(mkt)
+    df = merge_regime_into_panel(df, regime_df)
+    df = df.dropna(subset=MKT_REGIME_FEATURES).reset_index(drop=True)
+    print("合併大盤 regime 後樣本數:", len(df))
 
-
-    # 存檔
-    df.to_csv("model_input_2330.csv", index=False)
-    print("已產生 model_input_2330.csv")
-    print(df["label"].value_counts(normalize=True))
+    # 存檔（多檔合併後）
+    df.to_csv("model_input_multi.csv", index=False)
+    print("已產生 model_input_multi.csv")
 
     # 切訓練集與測試集
     train = df[df["date"] < "2025-01-01"]
     test  = df[df["date"] >= "2025-01-01"]
 
-    # features = df.columns.drop(["date", "label", "future_return_60"])
+    # 特徵：個股技術 + 基本面 + 大盤 regime
     features = [
-        "open","high","low","close","volume",
-        "ma5","ma20","ma60","ma120","ma240",
-        "return_1","return_5",
-        "rsi_120","rsi_240","rsi_420",
-        "ema120","ema240","ema420","ema200",
-        "fund_score"   # 只用當下可取得的資訊
+        "open", "high", "low", "close", "volume",
+        "ma5", "ma20", "ma60", "ma120", "ma240",
+        "return_1", "return_5",
+        "rsi_120", "rsi_240", "rsi_420",
+        "ema120", "ema240", "ema420", "ema200",
+        "fund_score",
+        *MKT_REGIME_FEATURES,
     ]
 
     
@@ -374,9 +330,9 @@ def main():
     )
     model.fit(X_train, y_train)
 
-    # 存模型
-    joblib.dump(model, "rf_model_2330.pkl")
-    print("模型已存檔：rf_model_2330.pkl")
+    # 存模型（多檔訓練，適用全部股票；請將 MODEL_PATH 指向此檔）
+    joblib.dump(model, "rf_model_multi.pkl")
+    print("模型已存檔：rf_model_multi.pkl（多檔通用，請設定 MODEL_PATH=./rf_model_multi.pkl）")
 
     # 預測
     proba = model.predict_proba(X_test)[:, 1]
@@ -483,7 +439,7 @@ def main():
 
 
     print("一年幾次:", len(trade_days))  # 一年幾次
-    print("平均報酬:", trade_days["future_return_60"].mean())
+    print("平均報酬:", trade_days["future_return_30"].mean())
 
     # 繪製策略曲線
     plt.figure(figsize=(12,4))

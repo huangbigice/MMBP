@@ -27,7 +27,7 @@
 ## 主要假設
 
 - **模型**：Random Forest 三類標籤——不建議持有 / 長期持有 / 觀望；特徵集與 `DataService.required_features()` 一致。
-- **評分邏輯**（`system_rating.py`）：系統權重——模型機率 0.45、基本面 0.30、技術面 0.25；門檻 THRESH_BUY=0.60、THRESH_HOLD=0.50。
+- **評分邏輯**（`system_rating.py`）：系統權重——模型機率 0.50、基本面 0.25、技術面 0.25；門檻 THRESH_BUY=0.60、THRESH_HOLD=0.50。
 - **回測**（`services/backtest_service.py`）：訊號由模型＋基本面門檻產生；倉位為 2 ATR 移動停損；可選波動率目標倉位；手續費 0.15%；無滑價假設。
 
 ---

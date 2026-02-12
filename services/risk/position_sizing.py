@@ -65,3 +65,44 @@ def compute_vol_target_weights(
     weight = raw_weight.clip(upper=config.max_leverage)
     weight = weight * position_binary
     return weight.fillna(0.0)
+
+
+def compute_confidence_vol_weights(
+    position: pd.Series,
+    proba_buy: pd.Series,
+    returns: pd.Series,
+    config: VolTargetConfig,
+) -> pd.Series:
+    """
+    依波動率目標與模型機率計算每日倉位權重（可正可負）。
+
+    - 多單 (position==1)：weight = proba_buy * vol_target_weight，上限 max_leverage。
+    - 空單 (position==-1)：weight = -(1 - proba_buy) * vol_target_weight，下限 -max_leverage。
+    - 空倉 (position==0)：weight = 0。
+
+    Parameters
+    ----------
+    position : pd.Series
+        每日倉位 -1 / 0 / 1，與 returns 同 index。
+    proba_buy : pd.Series
+        模型輸出「做多」機率 (0~1)，與 returns 同 index。
+    returns : pd.Series
+        標的日報酬（例如 return_1）。
+    config : VolTargetConfig
+        波動率目標參數。
+
+    Returns
+    -------
+    pd.Series
+        每日權重，正=多、負=空，與輸入同 index。
+    """
+    # 有倉位時才給 vol target 規模
+    position_binary = (position != 0).astype(float)
+    vol_weight = compute_vol_target_weights(position_binary, returns, config)
+
+    # 信心係數：多單用 proba_buy，空單用 (1 - proba_buy)
+    confidence = proba_buy.where(position == 1, 1.0 - proba_buy).where(position != 0, 0.0)
+    raw = vol_weight * confidence
+    # 空單為負
+    weight = raw.where(position >= 0, -raw)
+    return weight.fillna(0.0)

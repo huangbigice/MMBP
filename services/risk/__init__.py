@@ -7,6 +7,7 @@
 
 from .position_sizing import (
     VolTargetConfig,
+    compute_confidence_vol_weights,
     compute_vol_target_weights,
 )
 from .portfolio import (
@@ -18,6 +19,7 @@ from .portfolio import (
 
 __all__ = [
     "VolTargetConfig",
+    "compute_confidence_vol_weights",
     "compute_vol_target_weights",
     "PortfolioRiskConfig",
     "align_returns",

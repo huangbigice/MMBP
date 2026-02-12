@@ -20,7 +20,7 @@ MODEL_EFFECTIVE_DATE = "2026-02-01"
 TRAINING_INTERVAL: Optional[str] = None  # e.g. "2020-01-01 to 2025-12-31"
 MAIN_ASSUMPTIONS: tuple[str, ...] = (
     "Random Forest 三類標籤：不建議持有 / 長期持有 / 觀望",
-    "系統評分權重：模型機率 0.45、基本面 0.30、技術面 0.25",
+    "系統評分權重：模型機率 0.50、基本面 0.25、技術面 0.25",
     "回測：2 ATR 移動停損、波動率目標倉位、手續費 0.15%",
 )
 

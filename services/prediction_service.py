@@ -60,18 +60,26 @@ class PredictionService:
 
         df = self._data_service.fetch_stock_data(symbol=symbol, period=period)
         df = self._data_service.add_indicators(df)
+        df = self._data_service.add_market_regime(df)
 
         fund_score_dict = get_latest_fund_score(symbol)
-        df["fund_score"] = fund_score_dict["total_score"]
+        raw_fund = fund_score_dict.get("total_score")
+        df["fund_score"] = 0.5 if raw_fund is None or pd.isna(raw_fund) else raw_fund
 
         features = self._data_service.required_features()
         df_latest = df.iloc[-1:].copy()
 
+        # 若最新一筆有缺值，改用「最後一筆特徵完整的列」做預測，避免多數請求因單日缺值而失敗
         if df_latest[features].isna().any().any():
-            raise ValueError(
-                "最新一天特徵有缺失值，資料不足以進行預測。"
-                "可能原因：該股票歷史資料不足（需至少約 420 個交易日）、最近有缺漏，或資料源暫時異常。請稍後再試。"
-            )
+            complete = df.dropna(subset=features)
+            if complete.empty:
+                missing = df_latest[features].columns[df_latest[features].isna().any()].tolist()
+                raise ValueError(
+                    "特徵有缺失值，資料不足以進行預測。"
+                    f"缺失欄位：{missing[:10]}{'...' if len(missing) > 10 else ''}。"
+                    "可能原因：該股票歷史資料不足（需至少約 420 個交易日）、最近有缺漏，或資料源暫時異常。"
+                )
+            df_latest = complete.iloc[-1:].copy()
 
         X = df_latest[features]
 
