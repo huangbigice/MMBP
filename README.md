@@ -151,7 +151,7 @@
   - 在原始 DataFrame 上加入各種技術指標：
     - 移動平均：`ma5`, `ma20`, `ma60`, `ma120`, `ma240`。
     - 報酬率：`return_1`, `return_5`。
-    - RSI：`rsi_120`, `rsi_240`, `rsi_420`（透過 `train_model.train_model第五版.compute_rsi`）。
+    - RSI：`rsi_120`, `rsi_240`, `rsi_420`（透過 `train_model.train_model第六版.compute_rsi`）。
     - EMA：`ema120`, `ema240`, `ema420`, `ema200`。
 
 - **`required_features()`**
@@ -469,7 +469,7 @@ uvicorn main:app --reload --host 0.0.0.0 --port 8000
 - `config/`：
   - `config_loader.py`：集中管理設定值，如模型路徑。
 - `train_model/`：
-  - `train_model第五版.py` 等：模型訓練與指標計算程式，供離線訓練使用。
+  - `train_model第六版.py` 等：模型訓練與指標計算程式，供離線訓練使用。
 - `system_rating.py`：系統評分邏輯（整合技術面與基本面）。
 - `fundamentals.py` / `news.py` / `stock_code.py` 等：
   - 與基本面、新聞、或股票代碼處理相關模組（視實際內容而定）。

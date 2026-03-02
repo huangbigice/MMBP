@@ -34,7 +34,7 @@ from services.backtest.walk_forward import (
     generate_walk_forward_windows,
     run_walk_forward,
 )
-from train_model.train_model第五版 import compute_rsi
+from train_model.train_model第六版 import compute_rsi
 
 DEFAULT_SYMBOL = "2330.TW"
 
@@ -236,12 +236,17 @@ def run_layer3_regime_survival(
         print(f"  取得回測 df 失敗: {e}")
         return {"passed": False}
 
-    if "regime" not in df.columns or "mkt_vol_60d" not in df.columns:
-        print("  缺少 regime 或 mkt_vol_60d，改用 close 波動代理")
-        df["ret"] = df["return_1"]
+    if "mkt_vol_60d" not in df.columns:
+        print("  缺少 mkt_vol_60d，改用 close 波動代理")
+        df["ret"] = df.get("return_1", df["close"].pct_change())
         vol_60 = df["ret"].rolling(60).std()
-        if "mkt_vol_60d" not in df.columns:
-            df["mkt_vol_60d"] = vol_60
+        df["mkt_vol_60d"] = vol_60
+    if "regime" not in df.columns:
+        # 回測 df 可能只有 MKT_REGIME_FEATURES，無離散 regime；用收盤相對均線代理
+        if "mkt_close_over_ma20" in df.columns:
+            df["regime"] = np.where(df["mkt_close_over_ma20"] > 0, 1, np.where(df["mkt_close_over_ma20"] < 0, -1, 0))
+        else:
+            df["regime"] = 0
 
     # 波動高低：以 mkt_vol_60d 分位數切
     vol_th = df["mkt_vol_60d"].quantile(vol_percentile_high)
@@ -473,6 +478,7 @@ def run_all_five_layers(
 ) -> dict:
     """依序執行五層測試。需在專案根目錄執行，或確保 config/model 可載入。"""
     config = ConfigLoader().config
+    strategy_config = ConfigLoader.load_strategy_config()
     model_loader = ModelLoader(ModelLoadConfig(model_path=config.model_path))
     data_service = DataService()
     version_info = get_model_version_info()
@@ -480,6 +486,7 @@ def run_all_five_layers(
         data_service=data_service,
         model_loader=model_loader,
         model_version_info=version_info,
+        strategy_config=strategy_config,
     )
 
     summary = {}

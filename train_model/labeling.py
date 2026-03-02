@@ -104,3 +104,68 @@ def build_relative_labels(
     df["label"] = label
 
     return df
+
+
+def build_quality_labels(
+    df: pd.DataFrame,
+    horizon_col: str = "future_return_30",
+    *,
+    top_pct: float = 0.12,
+    bottom_pct: float = 0.12,
+    min_stocks_per_date: int = 5,
+) -> pd.DataFrame:
+    """
+    依當日橫斷面排名建構「強勢 / 弱勢 / 趨勢不明」三類標籤。
+
+    同一交易日內，依 horizon_col（未來報酬）排序：
+    - 排名前 top_pct（預設 12%）→ 1（強勢）
+    - 排名後 bottom_pct（預設 12%）→ 0（弱勢）
+    - 其餘 → 2（趨勢不明）
+
+    當日樣本數少於 min_stocks_per_date 的日期會整日剔除。
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        合併後 panel，需含 date 與 horizon_col。
+    horizon_col : str
+        未來報酬欄位名（如 future_return_30）。
+    top_pct : float
+        前多少比例標為 1（強勢）。
+    bottom_pct : float
+        後多少比例標為 0（弱勢）。
+    min_stocks_per_date : int
+        當日至少幾檔才納入，否則該日所有列剔除。
+
+    Returns
+    -------
+    pd.DataFrame
+        新增欄位 "label"（0=弱勢 / 1=強勢 / 2=趨勢不明）。
+    """
+    df = df.copy()
+    if "date" not in df.columns:
+        raise ValueError("df 需含 date 欄位")
+    if horizon_col not in df.columns:
+        raise ValueError(f"df 需含 {horizon_col} 欄位")
+
+    # 樣本數過少的日期整日剔除
+    date_counts = df.groupby("date").size()
+    valid_dates = date_counts[date_counts >= min_stocks_per_date].index
+    df = df[df["date"].isin(valid_dates)].copy()
+
+    # 依日期、未來報酬排序（同一日內報酬高者在前）
+    df = df.sort_values(["date", horizon_col], ascending=[True, False]).reset_index(drop=True)
+
+    # 預設為趨勢不明(2)
+    df["label"] = 2
+
+    # 每個交易日內：前 top_pct 筆為強勢(1)，後 bottom_pct 筆為弱勢(0)
+    for date, grp in df.groupby("date", group_keys=False):
+        n = len(grp)
+        n_top = max(1, int(n * top_pct))
+        n_bot = max(1, int(n * bottom_pct))
+        idx = grp.index
+        df.loc[idx[:n_top], "label"] = 1
+        df.loc[idx[-n_bot:], "label"] = 0
+
+    return df

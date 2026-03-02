@@ -136,3 +136,118 @@ def aggregate_portfolio_returns(
     scale = scale.clip(upper=2.0)  # 避免過度槓桿
     scaled_return = portfolio_return * scale.shift(1).fillna(1.0)
     return scaled_return
+
+
+def build_smart_portfolio(
+    candidate_symbols: list[str],
+    rating_service,
+    top_n: int = 8,
+    start: str | None = None,
+    end: str | None = None,
+) -> list[dict[str, any]]:
+    """
+    從候選股票中篩選優質組合（僅 A/B 級）。
+
+    智慧組合建構流程：
+    1. 計算每檔股票的品質評級（基於回測 Sharpe Ratio）
+    2. 只保留 A/B 級股票（portfolio_eligible = True）
+    3. 按 Sharpe Ratio 降序排序
+    4. 選取前 top_n 檔股票
+
+    Parameters
+    ----------
+    candidate_symbols : list[str]
+        候選股票代碼列表，如 ["2330.TW", "2454.TW", ...]。
+    rating_service : RatingService
+        評級服務實例，用於計算股票評級。
+    top_n : int
+        組合最大持股數，預設 8 檔。
+    start : str | None
+        評級回測開始日期 YYYY-MM-DD。None 時使用預設（最近 3 年）。
+    end : str | None
+        評級回測結束日期 YYYY-MM-DD。None 時使用今天。
+
+    Returns
+    -------
+    list[dict[str, any]]
+        優質股票組合列表，每項包含：
+        - symbol: 股票代碼
+        - rating: 品質評級
+        - label: 評級標籤
+        - sharpe_ratio: Sharpe Ratio
+        - suggested_weight: 建議權重（簡化版等權或基於 Sharpe）
+
+    Examples
+    --------
+    >>> from services.rating_service import RatingService
+    >>> rating_svc = RatingService(backtest_service)
+    >>> candidates = ["2330.TW", "3481.TW", "2454.TW", "2317.TW"]
+    >>> portfolio = build_smart_portfolio(candidates, rating_svc, top_n=3)
+    >>> # 預期返回：[2330.TW (A級), 2454.TW (A級), 2317.TW (B級)]
+    >>> # 排除：3481.TW (F級)
+    """
+    # 篩選符合組合資格的股票（A/B 級）
+    eligible_stocks = rating_service.filter_eligible_stocks(
+        symbols=candidate_symbols,
+        start=start,
+        end=end,
+    )
+
+    # 選取前 top_n 檔
+    selected = eligible_stocks[:top_n]
+
+    # 計算建議權重（簡化版：等權或基於 Sharpe 比例）
+    if not selected:
+        return []
+
+    total_sharpe = sum(sharpe for _, sharpe in selected)
+    if total_sharpe <= 0:
+        # 若總 Sharpe 為負或零，使用等權
+        weight = 1.0 / len(selected)
+        weights = [weight] * len(selected)
+    else:
+        # 基於 Sharpe 比例分配權重
+        weights = [sharpe / total_sharpe for _, sharpe in selected]
+
+    # 組合結果
+    portfolio = []
+    for (symbol, sharpe), weight in zip(selected, weights):
+        # 取得完整評級資訊
+        rating_info = rating_service.calculate_stock_rating(symbol, start, end)
+        portfolio.append(
+            {
+                "symbol": symbol,
+                "rating": rating_info["rating"],
+                "label": rating_info["label"],
+                "sharpe_ratio": sharpe,
+                "suggested_weight": round(weight, 4),
+            }
+        )
+
+    return portfolio
+
+
+def get_default_smart_portfolio(rating_service) -> list[dict[str, any]]:
+    """
+    取得預設優質組合（從配置檔的優質股票池建構）。
+
+    Parameters
+    ----------
+    rating_service : RatingService
+        評級服務實例。
+
+    Returns
+    -------
+    list[dict[str, any]]
+        預設優質組合，格式同 build_smart_portfolio。
+    """
+    # 取得預設優質股票池
+    quality_stocks = rating_service.get_quality_stocks()
+    candidate_symbols = [stock.symbol for stock in quality_stocks]
+
+    # 建構智慧組合
+    return build_smart_portfolio(
+        candidate_symbols=candidate_symbols,
+        rating_service=rating_service,
+        top_n=8,
+    )

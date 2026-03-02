@@ -5,7 +5,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 
-from train_model.train_model第五版 import compute_rsi
+from train_model.train_model第六版 import compute_rsi
 
 # ========== 參數 ==========
 SYMBOL = "2330.TW"

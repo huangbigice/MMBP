@@ -70,7 +70,7 @@ def add_adx(df: pd.DataFrame, period: int = 14) -> pd.DataFrame:
 def compute_regime(
     df: pd.DataFrame,
     *,
-    adx_threshold: float = 20.0,
+    adx_threshold: float = 15.0,
     slope_window: int = 5,
 ) -> pd.Series:
     """
@@ -86,7 +86,7 @@ def compute_regime(
     df : pd.DataFrame
         需含 close, ma_200, ADX。ma_200_slope 若不存在會自動以 ma_200.diff(slope_window) 計算。
     adx_threshold : float
-        ADX 門檻，僅高於此值視為有趨勢。
+        ADX 門檻，僅高於此值視為有趨勢（從 20.0 降至 15.0，放寬趨勢判定）。
     slope_window : int
         ma_200 斜率計算的差分天數。
 

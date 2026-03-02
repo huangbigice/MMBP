@@ -1,0 +1,195 @@
+合併大盤 regime 後樣本數: 1534203
+
+===== 壓力測試開始 =====
+
+[*********************100%***********************]  1 of 1 completed
+===== COVID 崩盤 壓力測試結果 =====
+  Total Return: 0.3284
+  Annual Return: 2.1141
+  Annual Volatility: 0.1158
+  Sharpe Ratio: 18.2553
+  Max Drawdown: 0.0000
+  Win Rate: 1.0000
+  Beta: -0.1575
+  Annual Alpha: 2.0980
+  Information Ratio: 19.1419
+
+===== 2008 金融危機 壓力測試結果 =====
+  Total Return: 0.4085
+  Annual Return: 1.7942
+  Annual Volatility: 0.1403
+  Sharpe Ratio: 12.7867
+  Max Drawdown: 0.0000
+  Win Rate: 1.0000
+  Beta: 0.4840
+  Annual Alpha: 2.3628
+  Information Ratio: 21.1591
+
+===== 2022 通膨沖擊 壓力測試結果 =====
+  Total Return: 0.0706
+  Annual Return: 0.1462
+  Annual Volatility: 0.0197
+  Sharpe Ratio: 7.4213
+  Max Drawdown: 0.0000
+  Win Rate: 1.0000
+  Beta: -0.0850
+  Annual Alpha: 0.1129
+  Information Ratio: 27.3191
+
+===== 蒙地卡羅隨機化報酬測試 =====
+模擬 1: Total Return = 3.8292
+模擬 2: Total Return = 3.6423
+模擬 3: Total Return = 3.6719
+模擬 4: Total Return = 3.6706
+模擬 5: Total Return = 3.6104
+
+===== 資料缺失/異常值測試 =====
+缺失資料測試結果:
+  Total Return: 402.5658
+  Annual Return: 0.3433
+  Annual Volatility: 0.1020
+  Sharpe Ratio: 3.3644
+  Max Drawdown: -0.1227
+  Win Rate: 0.8566
+  Beta: 0.0138
+  Annual Alpha: 0.3421
+  Information Ratio: 2.5530
+
+特徵異常值測試結果:
+  Total Return: 402.4953
+  Annual Return: 0.3432
+  Annual Volatility: 0.1020
+  Sharpe Ratio: 3.3642
+  Max Drawdown: -0.1227
+  Win Rate: 0.8566
+  Beta: 0.0138
+  Annual Alpha: 0.3421
+  Information Ratio: 2.5529
+
+===== 壓力測試完成 =====
+/stress_test.py:190: UserWarning: Glyph 23849 (\N{CJK UNIFIED IDEOGRAPH-5D29}) missing from font(s) DejaVu Sans.
+  plt.show()
+/stress_test.py:190: UserWarning: Glyph 30436 (\N{CJK UNIFIED IDEOGRAPH-76E4}) missing from font(s) DejaVu Sans.
+  plt.show()
+/stress_test.py:190: UserWarning: Glyph 32047 (\N{CJK UNIFIED IDEOGRAPH-7D2F}) missing from font(s) DejaVu Sans.
+  plt.show()
+/stress_test.py:190: UserWarning: Glyph 31309 (\N{CJK UNIFIED IDEOGRAPH-7A4D}) missing from font(s) DejaVu Sans.
+  plt.show()
+/stress_test.py:190: UserWarning: Glyph 22577 (\N{CJK UNIFIED IDEOGRAPH-5831}) missing from font(s) DejaVu Sans.
+  plt.show()
+/stress_test.py:190: UserWarning: Glyph 37228 (\N{CJK UNIFIED IDEOGRAPH-916C}) missing from font(s) DejaVu Sans.
+  plt.show()
+/stress_test.py:190: UserWarning: Glyph 26354 (\N{CJK UNIFIED IDEOGRAPH-66F2}) missing from font(s) DejaVu Sans.
+  plt.show()
+/stress_test.py:190: UserWarning: Glyph 32218 (\N{CJK UNIFIED IDEOGRAPH-7DDA}) missing from font(s) DejaVu Sans.
+  plt.show()
+/stress_test.py:197: UserWarning: Glyph 23849 (\N{CJK UNIFIED IDEOGRAPH-5D29}) missing from font(s) DejaVu Sans.
+  plt.show()
+/stress_test.py:197: UserWarning: Glyph 30436 (\N{CJK UNIFIED IDEOGRAPH-76E4}) missing from font(s) DejaVu Sans.
+  plt.show()
+/stress_test.py:197: UserWarning: Glyph 26376 (\N{CJK UNIFIED IDEOGRAPH-6708}) missing from font(s) DejaVu Sans.
+  plt.show()
+/stress_test.py:197: UserWarning: Glyph 22577 (\N{CJK UNIFIED IDEOGRAPH-5831}) missing from font(s) DejaVu Sans.
+  plt.show()
+/stress_test.py:197: UserWarning: Glyph 37228 (\N{CJK UNIFIED IDEOGRAPH-916C}) missing from font(s) DejaVu Sans.
+  plt.show()
+/stress_test.py:190: UserWarning: Glyph 37329 (\N{CJK UNIFIED IDEOGRAPH-91D1}) missing from font(s) DejaVu Sans.
+  plt.show()
+/stress_test.py:190: UserWarning: Glyph 34701 (\N{CJK UNIFIED IDEOGRAPH-878D}) missing from font(s) DejaVu Sans.
+  plt.show()
+/stress_test.py:190: UserWarning: Glyph 21361 (\N{CJK UNIFIED IDEOGRAPH-5371}) missing from font(s) DejaVu Sans.
+  plt.show()
+/stress_test.py:190: UserWarning: Glyph 27231 (\N{CJK UNIFIED IDEOGRAPH-6A5F}) missing from font(s) DejaVu Sans.
+  plt.show()
+/stress_test.py:197: UserWarning: Glyph 37329 (\N{CJK UNIFIED IDEOGRAPH-91D1}) missing from font(s) DejaVu Sans.
+  plt.show()
+/stress_test.py:197: UserWarning: Glyph 34701 (\N{CJK UNIFIED IDEOGRAPH-878D}) missing from font(s) DejaVu Sans.
+  plt.show()
+/stress_test.py:197: UserWarning: Glyph 21361 (\N{CJK UNIFIED IDEOGRAPH-5371}) missing from font(s) DejaVu Sans.
+  plt.show()
+/stress_test.py:197: UserWarning: Glyph 27231 (\N{CJK UNIFIED IDEOGRAPH-6A5F}) missing from font(s) DejaVu Sans.
+  plt.show()
+/stress_test.py:190: UserWarning: Glyph 36890 (\N{CJK UNIFIED IDEOGRAPH-901A}) missing from font(s) DejaVu Sans.
+  plt.show()
+/stress_test.py:190: UserWarning: Glyph 33192 (\N{CJK UNIFIED IDEOGRAPH-81A8}) missing from font(s) DejaVu Sans.
+  plt.show()
+/stress_test.py:190: UserWarning: Glyph 27798 (\N{CJK UNIFIED IDEOGRAPH-6C96}) missing from font(s) DejaVu Sans.
+  plt.show()
+/stress_test.py:190: UserWarning: Glyph 25802 (\N{CJK UNIFIED IDEOGRAPH-64CA}) missing from font(s) DejaVu Sans.
+  plt.show()
+/stress_test.py:197: UserWarning: Glyph 36890 (\N{CJK UNIFIED IDEOGRAPH-901A}) missing from font(s) DejaVu Sans.
+  plt.show()
+/stress_test.py:197: UserWarning: Glyph 33192 (\N{CJK UNIFIED IDEOGRAPH-81A8}) missing from font(s) DejaVu Sans.
+  plt.show()
+/stress_test.py:197: UserWarning: Glyph 27798 (\N{CJK UNIFIED IDEOGRAPH-6C96}) missing from font(s) DejaVu Sans.
+  plt.show()
+/stress_test.py:197: UserWarning: Glyph 25802 (\N{CJK UNIFIED IDEOGRAPH-64CA}) missing from font(s) DejaVu Sans.
+  plt.show()
+/stress_test.py:190: UserWarning: Glyph 33945 (\N{CJK UNIFIED IDEOGRAPH-8499}) missing from font(s) DejaVu Sans.
+  plt.show()
+/stress_test.py:190: UserWarning: Glyph 22320 (\N{CJK UNIFIED IDEOGRAPH-5730}) missing from font(s) DejaVu Sans.
+  plt.show()
+/stress_test.py:190: UserWarning: Glyph 21345 (\N{CJK UNIFIED IDEOGRAPH-5361}) missing from font(s) DejaVu Sans.
+  plt.show()
+/stress_test.py:190: UserWarning: Glyph 32645 (\N{CJK UNIFIED IDEOGRAPH-7F85}) missing from font(s) DejaVu Sans.
+  plt.show()
+/stress_test.py:190: UserWarning: Glyph 27169 (\N{CJK UNIFIED IDEOGRAPH-6A21}) missing from font(s) DejaVu Sans.
+  plt.show()
+/stress_test.py:190: UserWarning: Glyph 25836 (\N{CJK UNIFIED IDEOGRAPH-64EC}) missing from font(s) DejaVu Sans.
+  plt.show()
+/stress_test.py:197: UserWarning: Glyph 33945 (\N{CJK UNIFIED IDEOGRAPH-8499}) missing from font(s) DejaVu Sans.
+  plt.show()
+/stress_test.py:197: UserWarning: Glyph 22320 (\N{CJK UNIFIED IDEOGRAPH-5730}) missing from font(s) DejaVu Sans.
+  plt.show()
+/stress_test.py:197: UserWarning: Glyph 21345 (\N{CJK UNIFIED IDEOGRAPH-5361}) missing from font(s) DejaVu Sans.
+  plt.show()
+/stress_test.py:197: UserWarning: Glyph 32645 (\N{CJK UNIFIED IDEOGRAPH-7F85}) missing from font(s) DejaVu Sans.
+  plt.show()
+/stress_test.py:197: UserWarning: Glyph 27169 (\N{CJK UNIFIED IDEOGRAPH-6A21}) missing from font(s) DejaVu Sans.
+  plt.show()
+/stress_test.py:197: UserWarning: Glyph 25836 (\N{CJK UNIFIED IDEOGRAPH-64EC}) missing from font(s) DejaVu Sans.
+  plt.show()
+/stress_test.py:190: UserWarning: Glyph 32570 (\N{CJK UNIFIED IDEOGRAPH-7F3A}) missing from font(s) DejaVu Sans.
+  plt.show()
+/stress_test.py:190: UserWarning: Glyph 22833 (\N{CJK UNIFIED IDEOGRAPH-5931}) missing from font(s) DejaVu Sans.
+  plt.show()
+/stress_test.py:190: UserWarning: Glyph 36039 (\N{CJK UNIFIED IDEOGRAPH-8CC7}) missing from font(s) DejaVu Sans.
+  plt.show()
+/stress_test.py:190: UserWarning: Glyph 26009 (\N{CJK UNIFIED IDEOGRAPH-6599}) missing from font(s) DejaVu Sans.
+  plt.show()
+/stress_test.py:190: UserWarning: Glyph 28204 (\N{CJK UNIFIED IDEOGRAPH-6E2C}) missing from font(s) DejaVu Sans.
+  plt.show()
+/stress_test.py:190: UserWarning: Glyph 35430 (\N{CJK UNIFIED IDEOGRAPH-8A66}) missing from font(s) DejaVu Sans.
+  plt.show()
+/stress_test.py:197: UserWarning: Glyph 32570 (\N{CJK UNIFIED IDEOGRAPH-7F3A}) missing from font(s) DejaVu Sans.
+  plt.show()
+/stress_test.py:197: UserWarning: Glyph 22833 (\N{CJK UNIFIED IDEOGRAPH-5931}) missing from font(s) DejaVu Sans.
+  plt.show()
+/stress_test.py:197: UserWarning: Glyph 36039 (\N{CJK UNIFIED IDEOGRAPH-8CC7}) missing from font(s) DejaVu Sans.
+  plt.show()
+/stress_test.py:197: UserWarning: Glyph 26009 (\N{CJK UNIFIED IDEOGRAPH-6599}) missing from font(s) DejaVu Sans.
+  plt.show()
+/stress_test.py:197: UserWarning: Glyph 28204 (\N{CJK UNIFIED IDEOGRAPH-6E2C}) missing from font(s) DejaVu Sans.
+  plt.show()
+/stress_test.py:197: UserWarning: Glyph 35430 (\N{CJK UNIFIED IDEOGRAPH-8A66}) missing from font(s) DejaVu Sans.
+  plt.show()
+/stress_test.py:190: UserWarning: Glyph 29305 (\N{CJK UNIFIED IDEOGRAPH-7279}) missing from font(s) DejaVu Sans.
+  plt.show()
+/stress_test.py:190: UserWarning: Glyph 24501 (\N{CJK UNIFIED IDEOGRAPH-5FB5}) missing from font(s) DejaVu Sans.
+  plt.show()
+/stress_test.py:190: UserWarning: Glyph 30064 (\N{CJK UNIFIED IDEOGRAPH-7570}) missing from font(s) DejaVu Sans.
+  plt.show()
+/stress_test.py:190: UserWarning: Glyph 24120 (\N{CJK UNIFIED IDEOGRAPH-5E38}) missing from font(s) DejaVu Sans.
+  plt.show()
+/stress_test.py:190: UserWarning: Glyph 20540 (\N{CJK UNIFIED IDEOGRAPH-503C}) missing from font(s) DejaVu Sans.
+  plt.show()
+/stress_test.py:197: UserWarning: Glyph 29305 (\N{CJK UNIFIED IDEOGRAPH-7279}) missing from font(s) DejaVu Sans.
+  plt.show()
+/stress_test.py:197: UserWarning: Glyph 24501 (\N{CJK UNIFIED IDEOGRAPH-5FB5}) missing from font(s) DejaVu Sans.
+  plt.show()
+/stress_test.py:197: UserWarning: Glyph 30064 (\N{CJK UNIFIED IDEOGRAPH-7570}) missing from font(s) DejaVu Sans.
+  plt.show()
+/stress_test.py:197: UserWarning: Glyph 24120 (\N{CJK UNIFIED IDEOGRAPH-5E38}) missing from font(s) DejaVu Sans.
+  plt.show()
+/stress_test.py:197: UserWarning: Glyph 20540 (\N{CJK UNIFIED IDEOGRAPH-503C}) missing from font(s) DejaVu Sans.
+  plt.show()

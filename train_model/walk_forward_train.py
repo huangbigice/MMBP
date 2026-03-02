@@ -17,7 +17,7 @@ from sklearn.ensemble import RandomForestClassifier
 from train_model.market_regime import MKT_REGIME_FEATURES
 
 
-# 與 train_model第五版 一致的特徵列表（個股技術 + 基本面 + 大盤 regime）
+# 與 train_model第六版 一致的特徵列表（個股技術 + 基本面 + 大盤 regime）
 TRAIN_FEATURES = [
     "open", "high", "low", "close", "volume",
     "ma5", "ma20", "ma60", "ma120", "ma240",
@@ -219,7 +219,7 @@ def main() -> None:
     csv_path = Path(args.csv)
     if not csv_path.exists():
         raise FileNotFoundError(
-            f"找不到 {csv_path}，請先執行 train_model第五版 產出含相對標籤與 regime 的 CSV。"
+            f"找不到 {csv_path}，請先執行 train_model第六版 產出含相對標籤與 regime 的 CSV。"
         )
 
     df = pd.read_csv(csv_path)

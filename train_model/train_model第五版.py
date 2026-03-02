@@ -1,7 +1,6 @@
 import yfinance as yf
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
 from sklearn.ensemble import RandomForestClassifier
 # from sklearn.metrics import roc_auc_score, accuracy_score, recall_score, log_loss
 from sklearn.metrics import classification_report
@@ -295,8 +294,8 @@ def main():
     print("合併大盤 regime 後樣本數:", len(df))
 
     # 存檔（多檔合併後）
-    df.to_csv("model_input_multi.csv", index=False)
-    print("已產生 model_input_multi.csv")
+    # df.to_csv("model_input_multi.csv", index=False)
+    # print("已產生 model_input_multi.csv")
 
     # 切訓練集與測試集
     train = df[df["date"] < "2025-01-01"]
@@ -440,13 +439,6 @@ def main():
 
     print("一年幾次:", len(trade_days))  # 一年幾次
     print("平均報酬:", trade_days["future_return_30"].mean())
-
-    # 繪製策略曲線
-    plt.figure(figsize=(12,4))
-    plt.plot(test["date"], test["cum_return"])
-    plt.title("Strategy Equity Curve")
-    plt.show()
-
 
 if __name__ == "__main__":
     # 這裡才放：

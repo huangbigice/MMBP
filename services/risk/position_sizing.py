@@ -17,8 +17,8 @@ import pandas as pd
 class VolTargetConfig:
     """波動率目標參數。"""
 
-    target_vol_annual: float = 0.10
-    """目標年化波動率，例如 0.10 = 10%。"""
+    target_vol_annual: float = 0.18
+    """目標年化波動率，例如 0.18 = 18%（從 10% 提升至 18%）。"""
 
     vol_lookback: int = 20
     """估計波動率之滾動視窗（交易日）。"""

@@ -56,7 +56,10 @@ class PredictionService:
         self._version_info = model_version_info
 
     def predict_latest(self, symbol: str, period: str = "10y") -> PredictionResult:
+        # 載入模型與附帶資訊（可能是分類器或迴歸模型）
         model = self._model_loader.load()
+        model_features = self._model_loader.get_features()
+        scaler = self._model_loader.get_scaler()
 
         df = self._data_service.fetch_stock_data(symbol=symbol, period=period)
         df = self._data_service.add_indicators(df)
@@ -66,7 +69,8 @@ class PredictionService:
         raw_fund = fund_score_dict.get("total_score")
         df["fund_score"] = 0.5 if raw_fund is None or pd.isna(raw_fund) else raw_fund
 
-        features = self._data_service.required_features()
+        # 決定特徵列表：若模型檔有保存，優先使用（確保順序一致）
+        features = self._data_service.required_features(model_features=model_features)
         df_latest = df.iloc[-1:].copy()
 
         # 若最新一筆有缺值，改用「最後一筆特徵完整的列」做預測，避免多數請求因單日缺值而失敗
@@ -81,21 +85,50 @@ class PredictionService:
                 )
             df_latest = complete.iloc[-1:].copy()
 
-        X = df_latest[features]
+        # ----- 根據模型型別（分類 / 迴歸）產生「長期持有機率」 -----
+        X = df_latest[features].fillna(0)
 
-        proba = model.predict_proba(X)[0]
-        classes = list(getattr(model, "classes_", []))
-        if not classes:
-            raise ValueError("模型缺少 classes_，無法對應輸出類別")
+        # 分類模型（有 predict_proba + classes_）
+        if hasattr(model, "predict_proba") and hasattr(model, "classes_"):
+            # 若有特徵標準化 scaler（例如 StandardScaler），先做 transform
+            if scaler is not None and hasattr(scaler, "transform"):
+                X_input = scaler.transform(X)
+            else:
+                X_input = X.values
 
-        probabilities: dict[str, float] = {}
-        for i, c in enumerate(classes):
-            label = LABEL_MAP.get(int(c), str(c))
-            probabilities[label] = float(round(float(proba[i]), 6))
+            proba_vec = model.predict_proba(X_input)[0]
+            classes = list(getattr(model, "classes_", []))
+            if not classes:
+                raise ValueError("模型缺少 classes_，無法對應輸出類別")
 
-        if 1 not in [int(c) for c in classes]:
-            raise ValueError("模型輸出未包含類別 1（長期持有），無法計算 proba_buy")
-        proba_buy = float(proba[classes.index(1)])
+            probabilities: dict[str, float] = {}
+            for i, c in enumerate(classes):
+                label = LABEL_MAP.get(int(c), str(c))
+                probabilities[label] = float(round(float(proba_vec[i]), 6))
+
+            if 1 not in [int(c) for c in classes]:
+                raise ValueError("模型輸出未包含類別 1（長期持有），無法計算 proba_buy")
+            proba_buy = float(proba_vec[classes.index(1)])
+
+        else:
+            # 迴歸模型：例如 RandomForestRegressor，輸出連續目標
+            # 假設 scaler（若存在）是將目標映射到 [0,1] 的 MinMaxScaler
+            y_pred = float(model.predict(X.values)[0])
+            if scaler is not None and hasattr(scaler, "transform"):
+                import numpy as np
+
+                proba_buy = float(scaler.transform(np.array([[y_pred]])).ravel()[0])
+            else:
+                proba_buy = y_pred
+
+            # 將值限制在 [0,1] 範圍內，避免極端值
+            proba_buy = max(0.0, min(1.0, float(proba_buy)))
+
+            # 建立簡化版機率字典，供前端顯示
+            probabilities = {
+                "長期持有": float(round(proba_buy, 6)),
+                "不建議持有": float(round(1.0 - proba_buy, 6)),
+            }
 
         df_latest["proba_buy"] = proba_buy
         rated_df = system_rating(df_latest)

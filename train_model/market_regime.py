@@ -51,6 +51,9 @@ def compute_market_regime_features(market_df: pd.DataFrame) -> pd.DataFrame:
     if "close" not in df.columns and "Close" in df.columns:
         df["close"] = df["Close"]
     close = df["close"]
+    # 若因重複欄位名（如 yfinance MultiIndex 扁平化後）導致 close 為多欄 DataFrame，取第一欄為 Series
+    if isinstance(close, pd.DataFrame):
+        close = close.iloc[:, 0]
     # 均線
     ma20 = close.rolling(20).mean()
     ma60 = close.rolling(60).mean()
